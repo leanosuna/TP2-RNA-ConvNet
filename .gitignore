@@ -94,6 +94,8 @@ models/
 
 # Stats (training logs)
 stats/
+info-tp.md
+info
 
 # OS files
 .DS_Store
