@@ -16,10 +16,11 @@ from PIL import Image
 torch.backends.cudnn.benchmark = True
 
 from config import (
-    RAW_DATASET_DIR, MODEL_SAVE_PATH,
+    MODEL_SAVE_PATH,
+    TRAIN_DATASET_DIR, VAL_DATASET_DIR, TEST_DATASET_DIR,
     CLASSES, NUM_CLASSES,
     IMAGE_WIDTH, IMAGE_HEIGHT, IMAGE_CHANNELS,
-    BATCH_SIZE, EPOCHS, VALIDATION_SPLIT, LEARNING_RATE, WEIGHT_DECAY,
+    BATCH_SIZE, EPOCHS, LEARNING_RATE, WEIGHT_DECAY,
     AUGMENT_ROTATION, AUGMENT_HFLIP, AUGMENT_BRIGHTNESS, AUGMENT_CONTRAST,
     AUGMENT_SATURATION, AUGMENT_HUE, AUGMENT_AFFINE_SCALE, AUGMENT_AFFINE_TRANSLATE,
     CONV_FILTERS, CONV_KERNEL_SIZE, CONV_POOL_SIZE,
@@ -91,7 +92,7 @@ def get_augment_transform():
     ])
 
 
-def load_images(base_dir, classes_list):
+def load_images(data_dir, classes_list):
     images = []
     labels = []
     base_transform = transforms.Compose([
@@ -101,17 +102,20 @@ def load_images(base_dir, classes_list):
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    for class_idx, class_name in enumerate(classes_list):
-        class_dir = os.path.join(base_dir, class_name)
-        if not os.path.isdir(class_dir):
-            print(f"  Warning: directory not found for class '{class_name}', skipping")
+    class_to_idx = {c: i for i, c in enumerate(classes_list)}
+
+    for fname in sorted(os.listdir(data_dir)):
+        if not fname.lower().endswith((".jpg", ".jpeg", ".png")):
             continue
-        for filename in sorted(os.listdir(class_dir)):
-            if filename.lower().endswith((".jpg", ".jpeg", ".png")):
-                img = Image.open(os.path.join(class_dir, filename)).convert("RGB")
-                img = base_transform(img)
-                images.append(img)
-                labels.append(class_idx)
+        prefix = fname.split("_")[0]
+        if prefix not in class_to_idx:
+            continue
+        img = Image.open(os.path.join(data_dir, fname)).convert("RGB")
+        img = base_transform(img)
+        images.append(img)
+        labels.append(class_to_idx[prefix])
+
+    print(f"  Loaded {len(images)} images from {data_dir}")
     return torch.stack(images), torch.tensor(labels, dtype=torch.long)
 
 
@@ -152,51 +156,35 @@ def main():
         print(f"  CUDA version: {torch.version.cuda}")
         print(f"  Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
-    print(f"\nLoading images from: {RAW_DATASET_DIR}")
-    all_images, all_labels = load_images(RAW_DATASET_DIR, CLASSES)
-    print(f"Total images loaded: {len(all_images)}")
+    print(f"\nLoading training images from: {TRAIN_DATASET_DIR}")
+    train_images, train_labels = load_images(TRAIN_DATASET_DIR, CLASSES)
 
-    if len(all_images) == 0:
-        print("ERROR: No images loaded. Check dataset path.")
+    print(f"\nLoading validation images from: {VAL_DATASET_DIR}")
+    val_images, val_labels = load_images(VAL_DATASET_DIR, CLASSES)
+
+    print(f"\nLoading test images from: {TEST_DATASET_DIR}")
+    test_images, test_labels = load_images(TEST_DATASET_DIR, CLASSES)
+
+    if len(train_images) == 0:
+        print("ERROR: No training images loaded. Check dataset path.")
         return
 
-    for i, cls in enumerate(CLASSES):
-        count = (all_labels == i).sum().item()
-        print(f"  Class '{cls}': {count} images")
-
-    rng = torch.Generator().manual_seed(42)
-    train_idx = []
-    val_idx = []
-
-    for i in range(NUM_CLASSES):
-        class_mask = all_labels == i
-        class_indices = class_mask.nonzero(as_tuple=True)[0]
-        class_indices = class_indices[torch.randperm(len(class_indices), generator=rng)]
-        split = int(len(class_indices) * (1 - VALIDATION_SPLIT))
-        train_idx.append(class_indices[:split])
-        val_idx.append(class_indices[split:])
-
-    train_idx = torch.cat(train_idx)
-    val_idx = torch.cat(val_idx)
-
-    train_images = all_images[train_idx]
-    train_labels = all_labels[train_idx]
-    val_images = all_images[val_idx]
-    val_labels = all_labels[val_idx]
-
-    print(f"\nSplitting data: {100 - VALIDATION_SPLIT*100:.0f}% train, {VALIDATION_SPLIT*100:.0f}% validation (stratified)")
-    print(f"  Train: {len(train_images)} images")
-    print(f"  Validation: {len(val_images)} images")
-
+    print(f"\nDataset distribution:")
     for i, cls in enumerate(CLASSES):
         t_count = (train_labels == i).sum().item()
         v_count = (val_labels == i).sum().item()
-        print(f"    Train '{cls}': {t_count} | Val '{cls}': {v_count}")
+        test_count = (test_labels == i).sum().item()
+        print(f"  Class '{cls}': train={t_count}, val={v_count}, test={test_count}")
 
     val_images = val_images.to(device)
     val_labels = val_labels.to(device)
     val_dataset = TensorDataset(val_images, val_labels)
     val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+
+    test_images = test_images.to(device)
+    test_labels = test_labels.to(device)
+    test_dataset = TensorDataset(test_images, test_labels)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
     print("\nBuilding ConvNet model...")
     model = ConvNet(NUM_CLASSES, CONV_FILTERS, LINEAR_LAYER_CONFIG, DROPOUT_RATE).to(device)
@@ -333,6 +321,29 @@ def main():
     cm = confusion_matrix(all_labels_np, all_preds)
     cm_df = pd.DataFrame(cm, index=CLASSES, columns=CLASSES)
     print(cm_df)
+
+    print(f"\nEvaluating on test set...")
+    model.eval()
+    all_preds_test = []
+    all_labels_test = []
+
+    with torch.no_grad():
+        for images, targets in test_loader:
+            outputs = model(images)
+            _, predicted = outputs.max(1)
+            all_preds_test.extend(predicted.cpu().numpy())
+            all_labels_test.extend(targets.cpu().numpy())
+
+    all_preds_test = np.array(all_preds_test)
+    all_labels_test = np.array(all_labels_test)
+
+    print("\nTest Set Classification Report:")
+    print(classification_report(all_labels_test, all_preds_test, target_names=CLASSES, zero_division=0))
+
+    print("\nTest Set Confusion Matrix:")
+    cm_test = confusion_matrix(all_labels_test, all_preds_test)
+    cm_test_df = pd.DataFrame(cm_test, index=CLASSES, columns=CLASSES)
+    print(cm_test_df)
 
     os.makedirs(os.path.dirname(MODEL_SAVE_PATH), exist_ok=True)
     checkpoint = {

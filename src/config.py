@@ -3,6 +3,9 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Dataset
+TRAIN_DATASET_DIR = os.path.join(BASE_DIR, "dataset", "train")
+VAL_DATASET_DIR = os.path.join(BASE_DIR, "dataset", "valid")
+TEST_DATASET_DIR = os.path.join(BASE_DIR, "dataset", "test")
 RAW_DATASET_DIR = os.path.join(BASE_DIR, "dataset", "raw")
 MODEL_SAVE_PATH = os.path.join(BASE_DIR, "models", "convnet_billetes.pth")
 
@@ -16,12 +19,11 @@ IMAGE_HEIGHT = 160
 IMAGE_CHANNELS = 3
 
 # Class weights (balanced by frequency)
-USE_CLASS_WEIGHTS = False
+USE_CLASS_WEIGHTS = True
 
 # Training parameters
-BATCH_SIZE = 16
-EPOCHS = 150
-VALIDATION_SPLIT = 0.2
+BATCH_SIZE = 32
+EPOCHS = 100
 LEARNING_RATE = 0.001
 WEIGHT_DECAY = 1e-4
 
@@ -35,13 +37,13 @@ AUGMENT_HUE = 0.05
 AUGMENT_AFFINE_SCALE = (0.9, 1.1)
 AUGMENT_AFFINE_TRANSLATE = (0.1, 0.1)
 
-# ConvNet architecture (Run 4 best - [64, 128, 256])
-CONV_FILTERS = [64, 128, 256]
+# ConvNet architecture (4 conv blocks for larger dataset)
+CONV_FILTERS = [64, 128, 256, 512]
 CONV_KERNEL_SIZE = 3
 CONV_POOL_SIZE = 2
 
-# Linear layers (AdaptiveAvgPool2d(4,4) -> 256*4*4 = 4096 input)
-LINEAR_LAYER_CONFIG = "256,D,128"
+# Linear layers (AdaptiveAvgPool2d(4,4) -> 512*4*4 = 8192 input)
+LINEAR_LAYER_CONFIG = "512,D,256"
 DROPOUT_RATE = 0.5
 
 # Early stopping
