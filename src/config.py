@@ -29,22 +29,25 @@ WEIGHT_DECAY = 1e-4
 
 # Data augmentation parameters
 AUGMENT_ROTATION = 15
-AUGMENT_HFLIP = 0.5
+AUGMENT_HFLIP = 0
 AUGMENT_BRIGHTNESS = 0.15
 AUGMENT_CONTRAST = 0.1
 AUGMENT_SATURATION = 0.1
-AUGMENT_HUE = 0.05
+AUGMENT_HUE = 0.02
 AUGMENT_AFFINE_SCALE = (0.9, 1.1)
 AUGMENT_AFFINE_TRANSLATE = (0.1, 0.1)
 
-# ConvNet architecture (4 conv blocks for larger dataset)
-CONV_FILTERS = [64, 128, 256, 512]
+# ConvNet architecture (3 conv blocks)
+CONV_FILTERS = [32, 64, 128]
 CONV_KERNEL_SIZE = 3
 CONV_POOL_SIZE = 2
 
-# Linear layers (AdaptiveAvgPool2d(4,4) -> 512*4*4 = 8192 input)
-LINEAR_LAYER_CONFIG = "512,D,256"
-DROPOUT_RATE = 0.5
+# Linear layers (AdaptiveAvgPool2d(4,4) -> 128*4*4 = 2048 input)
+LINEAR_LAYER_CONFIG = "256,D,128"
+DROPOUT_RATE = 0.3
+
+# Save options
+SAVE_KERAS = False
 
 # Early stopping
 EARLY_STOP_PATIENCE = 50

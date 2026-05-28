@@ -1,5 +1,6 @@
 import os
 import time
+import argparse
 import numpy as np
 import torch
 import torch.nn as nn
@@ -26,7 +27,7 @@ from config import (
     CONV_FILTERS, CONV_KERNEL_SIZE, CONV_POOL_SIZE,
     LINEAR_LAYER_CONFIG, DROPOUT_RATE,
     EARLY_STOP_PATIENCE, EARLY_STOP_MIN_DELTA, EARLY_STOP_START_EPOCH,
-    USE_CLASS_WEIGHTS,
+    USE_CLASS_WEIGHTS, SAVE_KERAS,
 )
 
 
@@ -123,6 +124,8 @@ def plot_training_history(history, save_path):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
 
+    plot_path = save_path.replace(".pth", "_training.png")
+
     axes[0].plot(history["train_loss"], label="train")
     axes[0].plot(history["val_loss"], label="validation")
     axes[0].set_title("Loss")
@@ -138,13 +141,16 @@ def plot_training_history(history, save_path):
     axes[1].legend()
 
     plt.tight_layout()
-    plot_path = save_path.replace(".pth", "_training.png")
     plt.savefig(plot_path)
     plt.close()
     print(f"Training history plot saved to: {plot_path}")
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Entrenar ConvNet para billetes argentinos")
+    parser.add_argument("--run", type=str, default=None, help="Nombre del run (ej: run16). Crea models/runXX/ con checkpoint y gráfico.")
+    args = parser.parse_args()
+
     print("=" * 60)
     print("ConvNet - Reconocimiento de Billetes Argentinos (PyTorch)")
     print("=" * 60)
@@ -360,7 +366,15 @@ def main():
     torch.save(checkpoint, MODEL_SAVE_PATH)
     print(f"\nModel saved to: {MODEL_SAVE_PATH}")
 
-    plot_training_history(history, MODEL_SAVE_PATH)
+    if args.run:
+        run_dir = os.path.join(os.path.dirname(MODEL_SAVE_PATH), args.run)
+        os.makedirs(run_dir, exist_ok=True)
+        run_model_path = os.path.join(run_dir, "convnet_billetes.pth")
+        torch.save(checkpoint, run_model_path)
+        print(f"Model also saved to: {run_model_path}")
+        plot_training_history(history, os.path.join(run_dir, "convnet_billetes.pth"))
+    else:
+        plot_training_history(history, MODEL_SAVE_PATH)
 
     print(f"\nBest epoch: {best_epoch}")
     print(f"Best val_loss: {best_val_loss:.4f}")
