@@ -25,6 +25,7 @@ from config import (
     CONV_FILTERS, CONV_KERNEL_SIZE, CONV_POOL_SIZE,
     LINEAR_LAYER_CONFIG, DROPOUT_RATE,
     EARLY_STOP_PATIENCE, EARLY_STOP_MIN_DELTA, EARLY_STOP_START_EPOCH,
+    USE_CLASS_WEIGHTS,
 )
 
 
@@ -205,7 +206,15 @@ def main():
     print(f"  Total parameters: {total_params:,}")
     print(f"  Trainable parameters: {trainable_params:,}")
 
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
+    if USE_CLASS_WEIGHTS:
+        class_counts = torch.bincount(train_labels)
+        class_weights = 1.0 / class_counts.float()
+        class_weights = class_weights / class_weights.sum() * NUM_CLASSES
+        class_weights = class_weights.to(device)
+        print(f"  Class weights: {[f'{w:.3f}' for w in class_weights]}")
+        criterion = nn.CrossEntropyLoss(weight=class_weights, label_smoothing=0.1)
+    else:
+        criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", factor=0.5, patience=10, min_lr=1e-6)
 
