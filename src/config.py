@@ -23,9 +23,9 @@ USE_CLASS_WEIGHTS = True
 
 # Training parameters
 BATCH_SIZE = 32
-EPOCHS = 100
+EPOCHS = 200
 LEARNING_RATE = 0.001
-WEIGHT_DECAY = 1e-4
+WEIGHT_DECAY = 0.01
 
 # Data augmentation parameters
 AUGMENT_ROTATION = 15
