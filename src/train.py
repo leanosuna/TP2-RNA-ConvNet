@@ -351,6 +351,34 @@ def main():
     cm_test_df = pd.DataFrame(cm_test, index=CLASSES, columns=CLASSES)
     print(cm_test_df)
 
+    print(f"\nEvaluating on training set...")
+    train_images_eval = train_images.to(device)
+    train_labels_eval = train_labels.to(device)
+    train_dataset_eval = TensorDataset(train_images_eval, train_labels_eval)
+    train_loader_eval = DataLoader(train_dataset_eval, batch_size=BATCH_SIZE, shuffle=False)
+
+    model.eval()
+    all_preds_train = []
+    all_labels_train = []
+
+    with torch.no_grad():
+        for images, targets in train_loader_eval:
+            outputs = model(images)
+            _, predicted = outputs.max(1)
+            all_preds_train.extend(predicted.cpu().numpy())
+            all_labels_train.extend(targets.cpu().numpy())
+
+    all_preds_train = np.array(all_preds_train)
+    all_labels_train = np.array(all_labels_train)
+
+    print("\nTraining Set Classification Report:")
+    print(classification_report(all_labels_train, all_preds_train, target_names=CLASSES, zero_division=0))
+
+    print("\nTraining Set Confusion Matrix:")
+    cm_train = confusion_matrix(all_labels_train, all_preds_train)
+    cm_train_df = pd.DataFrame(cm_train, index=CLASSES, columns=CLASSES)
+    print(cm_train_df)
+
     os.makedirs(os.path.dirname(MODEL_SAVE_PATH), exist_ok=True)
     checkpoint = {
         "model_state_dict": model.state_dict(),
@@ -373,6 +401,41 @@ def main():
         torch.save(checkpoint, run_model_path)
         print(f"Model also saved to: {run_model_path}")
         plot_training_history(history, os.path.join(run_dir, "convnet_billetes.pth"))
+
+        metrics_path = os.path.join(run_dir, "metrics.txt")
+        with open(metrics_path, "w", encoding="utf-8") as f:
+            f.write(f"Run: {args.run}\n")
+            f.write(f"Best epoch: {best_epoch}\n")
+            f.write(f"Best val_loss: {best_val_loss:.4f}\n")
+            if best_epoch > 0:
+                f.write(f"Best val_acc: {history['val_acc'][best_epoch - 1]:.4f}\n")
+            f.write(f"Training time: {elapsed:.1f}s ({elapsed/60:.1f} min)\n\n")
+
+            f.write("=" * 60 + "\n")
+            f.write("VALIDATION SET\n")
+            f.write("=" * 60 + "\n")
+            f.write(classification_report(all_labels_np, all_preds, target_names=CLASSES, zero_division=0))
+            f.write("\nConfusion Matrix:\n")
+            f.write(cm_df.to_string())
+            f.write("\n\n")
+
+            f.write("=" * 60 + "\n")
+            f.write("TEST SET\n")
+            f.write("=" * 60 + "\n")
+            f.write(classification_report(all_labels_test, all_preds_test, target_names=CLASSES, zero_division=0))
+            f.write("\nConfusion Matrix:\n")
+            f.write(cm_test_df.to_string())
+            f.write("\n\n")
+
+            f.write("=" * 60 + "\n")
+            f.write("TRAINING SET\n")
+            f.write("=" * 60 + "\n")
+            f.write(classification_report(all_labels_train, all_preds_train, target_names=CLASSES, zero_division=0))
+            f.write("\nConfusion Matrix:\n")
+            f.write(cm_train_df.to_string())
+            f.write("\n")
+
+        print(f"Metrics saved to: {metrics_path}")
     else:
         plot_training_history(history, MODEL_SAVE_PATH)
 

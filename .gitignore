@@ -86,16 +86,10 @@ dmypy.json
 # Jupyter Notebook
 .ipynb_checkpoints
 
-# Dataset (large files, manually collected)
-dataset/
-
-# Models (trained weights)
-models/
-
-# Stats (training logs)
-stats/
+# Stats
 info-tp.md
-info
+info-train.md
+conclusiones.md
 
 # OS files
 .DS_Store
